@@ -5,6 +5,7 @@ const github = require(`@actions/github`);
 const fetch = require("node-fetch");
 const version = "1.1.4"
 global.Headers = fetch.Headers;
+const azBoardsItemRegex = /(AB#)[0-9]*/g;
 
 main();
 async function main () {
@@ -19,31 +20,34 @@ async function main () {
 
 			var prTitle = await getPrTitle();
 			if (typeof(prTitle) != typeof(undefined) && (
+				// TODO: this should be based on config in the yml
 				prTitle.includes("Code cleanup") ||
 				prTitle.includes("Swagger update"))) {
 				console.log("Bot branches are not being checked towards Azure Boards");
 				return;
 			}
+			
+			// try {
+				// TODO: put this back in once we get the body working
+				// var workItemId = await getWorkItemIdFromPrTitle();
+				// await updateWorkItem(workItemId);
 
-			try {
-				var workItemId = await getWorkItemIdFromPrTitle();
-				await updateWorkItem(workItemId);
-			} catch (err) {
-				core.setFailed("Couldn't get work item ID from PR title, adjust the PR title");
-				core.setFailed(err.toString());
-			}
+				const workItems = await getWorkItemsFromPrBody();
+				console.log('workitems')
+				console.log(workItems)
+				for (let i in workItems) {
+					console.log('Updating workitem ' + workItems[i])
+					await updateWorkItem(workItems[i]);
+					console.log("Work item " + workItems[i] + " was updated successfully");
+				}
+				
+			// } catch (err) {
+			// 	core.setFailed("Couldn't get work item ID from PR title, adjust the PR title");
+			// 	core.setFailed(err.toString());
+			// }
 		} else {
-			console.log("Branch event detected");
-
-			if (process.env.branch_name.includes("master")){
-				console.log("Automation is not handling pushed towards master");
-				return;
-			}
-
-			var workItemId = await getWorkItemIdFromBranchName();
-			await updateWorkItem(workItemId);
+			console.log("Not implemented");
 		}
-		console.log("Work item " + workItemId + " was updated successfully");
 	} catch (err) {
 		core.setFailed(err.toString());
 	}
@@ -54,6 +58,41 @@ function getRequestHeaders(){
 	let auth = 'token ' + process.env.gh_token;
 	h.append('Authorization', auth);
 	return h;
+}
+
+async function getWorkItemsFromPrBody() {
+	const pullRequestBody = await getPrBody();
+
+	try {
+		return pullRequestBody.match(azBoardsItemRegex);
+		// foundMatches.forEach((item) => {
+		// 	console.log("Work item ID: " + item);
+		// });
+		// return foundMatches;
+	} catch (err) {
+		core.setFailed("Azure boards tag not found in PR body");
+	}
+}
+
+async function getPrBody() {
+	try {
+		console.log("Getting PR body");
+		const requestUrl = "https://api.github.com/repos/"+process.env.ghrepo_owner+"/"+process.env.ghrepo+"/pulls/"+process.env.pull_number;
+
+		const response = await fetch(requestUrl, {
+			method: 'GET',
+			headers: getRequestHeaders()
+		});
+		const result = await response.json();
+
+		try {
+			return result.body;
+		} catch (err) {
+			return "";
+		}
+	} catch (err) {
+		core.setFailed(err.toString());
+	}
 }
 
 async function getPrTitle() {
@@ -74,31 +113,6 @@ async function getPrTitle() {
 		}
 	} catch (err) {
 		core.setFailed(err.toString());
-	}
-}
-
-async function getWorkItemIdFromPrTitle() {		
-	var pullRequestTitle = await getPrTitle();
-
-	try {
-		var foundMatches = pullRequestTitle.match(/[(0-9)]*/g);
-		var workItemId = foundMatches[3];
-		console.log("Work item ID: " + workItemId);
-		return workItemId;
-	} catch (err) {
-		core.setFailed("Wrong PR name detected");
-	}
-}
-
-function getWorkItemIdFromBranchName() {
-	var branchName = process.env.branch_name;
-	try {
-		var foundMatches = branchName.match(/([0-9]+)/g);
-		var workItemId = foundMatches[0];
-		console.log("Work item ID: " + workItemId);
-		return workItemId
-	} catch (err) {
-		core.setFailed("Wrong Branch name detected");
 	}
 }
 
@@ -241,16 +255,35 @@ async function handleOpenBranch(workItemId){
 		);	
 }
 
-async function updateWorkItem(workItemId) {
+function getIdFromAbTag(abTag) {
+	return abTag.split('#')[1].trim()
+}
+
+// NOTE: since i'll be using three tasks with this action, I might be able to treat closedstate
+// as the closed state for that specific branch. Eg. :
+// Development: 
+// - propenstate: Development Completed
+// - closedstate: In Development
+// UAT:
+// - propenstate: Ready for testing
+// - closedstate: UAT
+// master:
+// - propenstate: Resolved
+// - closedstate: Closed
+async function updateWorkItem(abTag) {
 	let authHandler = azureDevOpsHandler.getPersonalAccessTokenHandler(process.env.ado_token);
 	let connection = new azureDevOpsHandler.WebApi("https://dev.azure.com/" + process.env.ado_organization, authHandler);
 	let client = await connection.getWorkItemTrackingApi();
+	const workItemId = getIdFromAbTag(abTag)
+	console.log('ABTAG: ', abTag)
+	console.log("WorkItemId", workItemId)
 	var workItem = await client.getWorkItem(workItemId);
+	console.dir(workItem);
 	console.log("Detected Work Item Type: " + workItem.fields["System.WorkItemType"])
 	
 	if (workItem.fields["System.State"] == process.env.closedstate)
 	{
-	    console.log("WorkItem is already closed and cannot be updated anymore.");
+	    console.log("WorkItem is already in a state of closed and cannot be updated anymore.");
 	    return;
 	} else if (workItem.fields["System.State"] == process.env.propenstate && await isMerged() == false) {
 	    console.log("WorkItem is already in a state of PR open, will not update.");
@@ -269,8 +302,7 @@ async function updateWorkItem(workItemId) {
 		console.log("PR IS CLOSED: " + process.env.inprogressstate);
 		await handleClosedPr(workItemId)
 	    } else {
-		console.log("BRANCH IS OPEN: " + process.env.inprogressstate);
-		await handleOpenBranch(workItemId);
+			console.log("Branch is not implemented")
 	    }
 	}
 }
@@ -299,5 +331,4 @@ function getValuesFromPayload(payload)
     return vm;
 }
 
-
-
+module.exports = {getWorkItemsFromPrBody}

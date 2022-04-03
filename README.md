@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Test workflow
     steps:       
-    - uses: MarcinGadomski94/pr-update-work-item-state@master
+    - uses: samcarswell/pr-update-work-item-state@master
       env: 
         gh_token : '${{ secrets.GH_TOKEN }}'   
         ado_token: '${{ secrets.ADO_PERSONAL_ACCESS_TOKEN }}'
@@ -28,6 +28,8 @@ jobs:
         ghrepo: 'Contoso-Microservice'
         pull_number: ${{github.event.number}} 
         branch_name: ${{ github.ref }}
+        title_exclusions: ['Code cleanup', 'Swagger update'] # TODO: implement and test this
+        include_body: true # TODO: not sure what this is: remove it? 
 
 ```
 
