@@ -47,7 +47,7 @@ function getRequestHeaders(){
 
 async function getAbTagsFromPrBody() {
 	const pullRequestBody = await getPrBody();
-
+	console.log(pullRequestBody)
 	try {
 		return pullRequestBody.match(azBoardsItemRegex);
 	} catch (err) {
