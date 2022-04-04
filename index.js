@@ -203,10 +203,7 @@ async function updateWorkItem(abTag) {
 	let connection = new azureDevOpsHandler.WebApi("https://dev.azure.com/" + process.env.ado_organization, authHandler);
 	let client = await connection.getWorkItemTrackingApi();
 	const workItemId = getIdFromAbTag(abTag)
-	console.log('ABTAG: ', abTag)
-	console.log("WorkItemId", workItemId)
 	var workItem = await client.getWorkItem(workItemId);
-	console.dir(workItem);
 	console.log("Detected Work Item Type: " + workItem.fields["System.WorkItemType"])
 	
 	if (workItem.fields["System.State"] == process.env.closedstate)
