@@ -9,26 +9,33 @@ const azBoardsItemRegex = /(AB#)[0-9]*/g;
 
 main();
 async function main () {
-	try {
-		console.log("VERSION " + version);
+    try {
+        console.log("VERSION " + version);
 
-		const context = github.context; 
-		let vm = getValuesFromPayload(github.context.payload);
-		try {
-			const abTags = await getAbTagsFromPrBody();
-			for (let i in abTags) {
-				console.log('Updating workitem ' + abTags[i])
-				await updateWorkItem(abTags[i]);
-				console.log("Work item " + abTags[i] + " was updated successfully");
-			}
+        const context = github.context;
+        let vm = getValuesFromPayload(github.context.payload);
 
-		} catch (err) {
-			core.setFailed("Couldn't read work items from PR body");
-			core.setFailed(err.toString());
-		}
-	} catch (err) {
-		core.setFailed(err.toString());
-	}
+        if (process.env.GITHUB_EVENT_NAME.includes("pull_request")){
+            console.log("PR event detected");
+
+            try {
+                const abTags = await getAbTagsFromPrBody();
+                for (let i in abTags) {
+                    console.log('Updating workitem ' + abTags[i])
+                    await updateWorkItem(abTags[i]);
+                    console.log("Work item " + abTags[i] + " was updated successfully");
+                }
+
+            } catch (err) {
+                core.setFailed("Couldn't read work items from PR body");
+                core.setFailed(err.toString());
+            }
+        } else {
+            console.log("Not implemented");
+        }
+    } catch (err) {
+        core.setFailed(err.toString());
+    }
 }
 
 function getRequestHeaders(){
