@@ -28,7 +28,7 @@ async function main () {
 
             } catch (err) {
                 core.setFailed("Couldn't read work items from PR body");
-                core.setFailed(err.toString());
+                core.setFailed(err.stack);
             }
         } else {
             console.log("Not implemented");
@@ -256,4 +256,4 @@ function getValuesFromPayload(payload)
     return vm;
 }
 
-module.exports = {getWorkItemsFromPrBody: getAbTagsFromPrBody}
+module.exports = {getWorkItemsFromPrBody: getAbTagsFromPrBody, updateWorkItem: updateWorkItem}
