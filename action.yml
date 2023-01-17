@@ -8,5 +8,5 @@ outputs:
   id:
     description: "Work item state updated"
 runs:
-  using: "node12"
+  using: "node16"
   main: "index.js"
